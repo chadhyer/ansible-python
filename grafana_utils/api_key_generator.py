@@ -48,8 +48,8 @@ class MissingArgumentError(Exception):
     Exception raised for missing arguments
     """
 
-    def __init__(self, missing_argument:str):
-        self.message = f'Missing argument! {missing_argument}!'
+    def __init__(self, argument_list:list):
+        self.message = f'Missing argument! {argument_list=}!'
         super().__init__(self.message)
 
 
@@ -99,7 +99,11 @@ def check_arguments(org:str, user:str, password:str, host:str, port:int, api_key
     for argument in argument_list:
         var = [key for key, value in locals().items() if value == argument]
         if isinstance(argument, type(None)):
-            raise MissingArgumentError(f'{var[index]} = {argument}')
+            try: 
+                raise MissingArgumentError(var)
+            except MissingArgumentError(var) as error:
+                raise SystemExit(error)
+
         index += 1
 
 
@@ -116,10 +120,14 @@ def check_api_key_file(org:str, api_key_file:Path) -> bool:
             False: api key is missing or associated name is different
     """
     if api_key_file.exists():
-        with api_key_file.open('r') as file:
-            data = json.loads(file.read())
-            if "key" in data and data['name'] == f'{org}_apikey':
-                return True
+        with open(api_key_file, 'r') as file:
+            try:
+                data = json.load(file)
+            except json.decoder.JSONDecodeError:
+                data = {}
+            if "key" in data and "name" in data:
+                if data['name'] == f'{org}_apikey':
+                    return True
     return False
 
 
@@ -146,11 +154,20 @@ def create_api_token(org_id:int, name:str, user:str, password:str, host:str, por
 
     access = f'http://{user}:{password}@{host}:{port}'
     url = access + '/api/auth/keys'
-    response = requests.post(url, json=json_data)
+
+    try:
+        response = requests.post(url, json=json_data)
+    except requests.exceptions.RequestException as error:
+        raise SystemExit(error)
+
     data = json.loads(str(response.content, 'utf-8'))
 
-    if "message" in data:
-        raise CreateAPITokenError(data['message'])
+    try:
+        if "message" in data:
+            raise CreateAPITokenError(data['message'])
+    except CreateAPITokenError as error:
+            raise SystemExit(error)
+
     if "key" in data:
         return data
 
@@ -176,12 +193,22 @@ def post_org(name:str, user:str, password:str, host:str, port:int) -> int:
 
     access = f'http://{user}:{password}@{host}:{port}'
     url = access + '/api/orgs'
-    response = requests.post(url, json=json_data)
+    
+    try:
+        response = requests.post(url, json=json_data)
+    except requests.exceptions.RequestException as error:
+        raise SystemExit(error)
+
     data = json.loads(str(response.content, 'utf-8'))
     
     if data['message'] == 'Organization name taken':
         url = access + '/api/orgs'
-        response = requests.get(url)
+
+        try:
+            response = requests.get(url)
+        except requests.exceptions.RequestException as error:
+            raise SystemExit(error)
+
         data = json.loads(str(response.content, 'utf-8'))
 
         for org in data:
@@ -192,11 +219,14 @@ def post_org(name:str, user:str, password:str, host:str, port:int) -> int:
     if data['message'] == 'Organization created':
         return int(data['orgId'])
 
-    if data['message'] == 'invalid username or password':
-        raise InvalidUsernameOrPasswordError(data['message'])
+    try:
+        if data['message'] == 'invalid username or password':
+            raise InvalidUsernameOrPasswordError(data['message'])
+    except InvalidUsernameOrPasswordError as error:
+        raise SystemExit(error)
 
 
-def main(argv):
+def main(args):
     GRAFANA_ORG = 'trusted'
     GRAFANA_USER = 'admin'
     GRAFANA_PASS = 'admin'
@@ -204,28 +234,24 @@ def main(argv):
     GRAFANA_PORT = 3000
     API_KEY_FILE = None
 
-    args_letters = "hHPupof"
-    args_words = [ "help", "host", "user", "pass", "org", "file" ]
-    try:
-        opts, args = getopt(argv, args_letters, args_words)
-    except GetoptError:
-        exit('Invalid argument used! Use -h or --help for README.md')
-    for opt, arg in opts:
-        if opt in ('-h', '--help'):
-            help_()
+    while args:
+        current_argument = args[0]
+        if current_argument in ('-h', '--help'):
+            print('help_()')
             exit(0)
-        if opt in ('-H', '--host'):
-            GRFANA_HOST = arg
-        if opt in ('-P', '--port'):
-            GRAFANA_PORT = arg
-        if opt in ('-u', '--user'):
-            GRAFANA_USER = arg
-        if opt in ('-p', '--pass'):
-            GRAFANA_PASS = arg
-        if opt in ('-o', '--org'):
-            GRAFANA_ORG = arg
-        if opt in ('-f', '--file'):
-            API_KEY_FILE = Path(arg)
+        if current_argument in ('-H', '--host'):
+            GRFANA_HOST = args[1]
+        if current_argument in ('-P', '--port'):
+            GRAFANA_PORT = args[1]
+        if current_argument in ('-u', '--user'):
+            GRAFANA_USER = args[1]
+        if current_argument in ('-p', '--pass'):
+            GRAFANA_PASS = args[1]
+        if current_argument in ('-o', '--org'):
+            GRAFANA_ORG = args[1]
+        if current_argument in ('-f', '--file'):
+            API_KEY_FILE = Path(args[1])
+        del args[0]
 
 
     check_arguments(GRAFANA_ORG, GRAFANA_USER, GRAFANA_PASS, GRFANA_HOST, GRAFANA_PORT, API_KEY_FILE)
@@ -243,7 +269,7 @@ def main(argv):
                             GRFANA_HOST, GRAFANA_PORT)
 
     with API_KEY_FILE.open('w') as file:
-        file.write(api_key)
+        json.dump(api_key, file, sort_keys=True, indent=4)
 
     api_exists = check_api_key_file(GRAFANA_ORG, API_KEY_FILE)
 
