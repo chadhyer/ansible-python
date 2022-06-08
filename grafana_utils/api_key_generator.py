@@ -264,7 +264,8 @@ def main(args):
         del args[0]
 
     try: 
-        check_arguments(GRAFANA_NAME, GRAFANA_USER, GRAFANA_PASS, GRFANA_HOST, GRAFANA_PORT, API_KEY_FILE)
+        check_arguments(GRAFANA_NAME, GRAFANA_USER, GRAFANA_PASS, GRFANA_HOST, 
+                        GRAFANA_PORT, API_KEY_FILE)
     except MissingArgumentError as error:
         raise SystemExit(error)
 
@@ -278,7 +279,8 @@ def main(args):
         return status
 
     try:
-        org_id = post_org(GRAFANA_NAME, GRAFANA_USER, GRAFANA_PASS, GRFANA_HOST, GRAFANA_PORT)
+        org_id = post_org(GRAFANA_NAME, GRAFANA_USER, GRAFANA_PASS, 
+                          GRFANA_HOST, GRAFANA_PORT)
     except requests.exceptions.RequestException as error:
         raise SystemExit(error)
     except requests.exceptions.RequestException as error:
@@ -287,14 +289,16 @@ def main(args):
         raise SystemExit(error)
 
     try:
-        switch_org(org_id, GRAFANA_USER, GRAFANA_PASS, GRFANA_HOST, GRAFANA_PORT)
+        switch_org(org_id, GRAFANA_USER, GRAFANA_PASS, GRFANA_HOST,
+                   GRAFANA_PORT)
     except requests.exceptions.RequestException as error:
         raise SystemExit(error)
     except OrganizationError as error:
         raise SystemExit(error)
     
     try:
-        api_key = create_api_token(GRAFANA_NAME, GRAFANA_USER, GRAFANA_PASS, GRFANA_HOST, GRAFANA_PORT)
+        api_key = create_api_token(GRAFANA_NAME, GRAFANA_USER, GRAFANA_PASS,
+                                   GRFANA_HOST, GRAFANA_PORT)
     except requests.exceptions.RequestException as error:
         raise SystemExit(error)
     except CreateAPITokenError as error:
